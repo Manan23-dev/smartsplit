@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "224743645424",
+    "project_id": "smartsplit-expensetracker",
+    "storage_bucket": "smartsplit-expensetracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:224743645424:android:d64b6df6707cbf44c8a235",
+        "android_client_info": {
+          "package_name": "com.example.smartsplit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBl36KnCSXv6z9UnoINTBVVM_VCbLWRY-Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
