@@ -6,7 +6,8 @@ import 'login_screen.dart';
 import 'home_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
-  const LoginScreen({super.key});
+  const AuthWrapper({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(

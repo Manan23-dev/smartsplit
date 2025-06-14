@@ -4,41 +4,63 @@ import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../providers/expense_provider.dart';
 import '../models/expense.dart';
-import '../services/auth_service.dart';
 
-class HomeScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Start listening to expenses when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<ExpenseProvider>().listenToExpenses();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Smartsplit'),
-        backgroundColor: Colors.blue,
+        backgroundColor: const Color(0xFF667eea),
         foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => _showLogoutDialog(context),
+            onPressed: () async {
+              await context.read<AuthProvider>().signOut();
+            },
           ),
         ],
       ),
       body: Consumer<ExpenseProvider>(
         builder: (context, expenseProvider, child) {
+          if (expenseProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
           if (expenseProvider.expenses.isEmpty) {
             return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.cloud_upload, size: 80, color: Colors.grey),
+                  Icon(Icons.receipt_long, size: 80, color: Colors.grey),
                   SizedBox(height: 16),
                   Text(
                     'No expenses yet!',
                     style: TextStyle(fontSize: 20, color: Colors.grey),
                   ),
                   Text(
-                    'Add your first expense - it will sync to the cloud!',
+                    'Add your first expense to get started',
                     style: TextStyle(color: Colors.grey),
-                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
@@ -53,25 +75,34 @@ class HomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Colors.blue, Colors.purple],
+                    colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.cloud_done, color: Colors.white, size: 32),
+                    const Icon(Icons.account_balance_wallet, 
+                              color: Colors.white, size: 32),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Total Expenses (Cloud Synced)',
-                            style: TextStyle(color: Colors.white70, fontSize: 14),
+                            'Total Expenses',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
                           ),
                           Text(
-                            NumberFormat.currency(symbol: '\$').format(expenseProvider.totalExpenses),
-                            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                            NumberFormat.currency(symbol: '\$')
+                                .format(expenseProvider.totalExpenses),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -83,7 +114,7 @@ class HomeScreen extends StatelessWidget {
               // Expenses List
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: expenseProvider.expenses.length,
                   itemBuilder: (context, index) {
                     final expense = expenseProvider.expenses[index];
@@ -101,23 +132,17 @@ class HomeScreen extends StatelessWidget {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  NumberFormat.currency(symbol: '\$').format(expense.amount),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const Icon(Icons.cloud_done, color: Colors.green, size: 16),
-                              ],
+                            Text(
+                              NumberFormat.currency(symbol: '\$')
+                                  .format(expense.amount),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                              onPressed: () => _deleteExpense(context, expense.id),
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _showDeleteDialog(expense.id),
                             ),
                           ],
                         ),
@@ -131,8 +156,8 @@ class HomeScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddExpenseDialog(context),
-        backgroundColor: Colors.blue,
+        onPressed: _showAddExpenseDialog,
+        backgroundColor: const Color(0xFF667eea),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Add Expense'),
@@ -140,12 +165,15 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _showAddExpenseDialog(BuildContext context) {
+  void _showAddExpenseDialog() {
     final titleController = TextEditingController();
     final amountController = TextEditingController();
     String selectedCategory = 'Food';
     
-    final categories = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Bills', 'Other'];
+    final categories = [
+      'Food', 'Transport', 'Entertainment', 
+      'Shopping', 'Bills', 'Health', 'Other'
+    ];
 
     showDialog(
       context: context,
@@ -153,7 +181,7 @@ class HomeScreen extends StatelessWidget {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Add New Expense'),
+              title: const Text('Add Expense'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -162,7 +190,6 @@ class HomeScreen extends StatelessWidget {
                     decoration: const InputDecoration(
                       labelText: 'Expense Title',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.title),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -171,7 +198,6 @@ class HomeScreen extends StatelessWidget {
                     decoration: const InputDecoration(
                       labelText: 'Amount (\$)',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.attach_money),
                     ),
                     keyboardType: TextInputType.number,
                   ),
@@ -181,7 +207,6 @@ class HomeScreen extends StatelessWidget {
                     decoration: const InputDecoration(
                       labelText: 'Category',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.category),
                     ),
                     items: categories.map((category) {
                       return DropdownMenuItem(
@@ -189,11 +214,7 @@ class HomeScreen extends StatelessWidget {
                         child: Text(category),
                       );
                     }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedCategory = value!;
-                      });
-                    },
+                    onChanged: (value) => setState(() => selectedCategory = value!),
                   ),
                 ],
               ),
@@ -202,25 +223,13 @@ class HomeScreen extends StatelessWidget {
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),
                 ),
-                Consumer<ExpenseProvider>(
-                  builder: (context, expenseProvider, child) {
-                    return ElevatedButton(
-                      onPressed: expenseProvider.isLoading 
-                          ? null 
-                          : () => _addExpense(context, titleController, amountController, selectedCategory),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: expenseProvider.isLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Add to Cloud'),
-                    );
-                  },
+                ElevatedButton(
+                  onPressed: () => _addExpense(
+                    titleController.text,
+                    amountController.text,
+                    selectedCategory,
+                  ),
+                  child: const Text('Add'),
                 ),
               ],
             );
@@ -230,89 +239,100 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _addExpense(BuildContext context, TextEditingController titleController, 
-                   TextEditingController amountController, String category) async {
-    if (titleController.text.isNotEmpty && amountController.text.isNotEmpty) {
-      final authService = AuthService();
-      final currentUser = authService.currentUser;
-      
-      if (currentUser != null) {
-        final expense = Expense(
-          title: titleController.text,
-          amount: double.tryParse(amountController.text) ?? 0.0,
-          date: DateTime.now(),
-          category: category,
-          userId: currentUser.uid,
-        );
-        
-        final success = await context.read<ExpenseProvider>().addExpense(expense);
-        
-        if (success && context.mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('💸 Expense added and synced to cloud!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ Failed to add expense'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  void _deleteExpense(BuildContext context, String expenseId) async {
-    final success = await context.read<ExpenseProvider>().deleteExpense(expenseId);
-    
-    if (success && context.mounted) {
+  void _addExpense(String title, String amountText, String category) async {
+    if (title.isEmpty || amountText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🗑️ Expense deleted from cloud!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ Failed to delete expense'),
+          content: Text('Please fill in all fields'),
           backgroundColor: Colors.red,
         ),
       );
+      return;
+    }
+
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid amount'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User not authenticated'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final expense = Expense(
+      title: title,
+      amount: amount,
+      date: DateTime.now(),
+      category: category,
+      userId: authProvider.user!.uid,
+    );
+
+    final success = await context.read<ExpenseProvider>().addExpense(expense);
+    
+    if (mounted) {
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success 
+              ? 'Expense added successfully!' 
+              : 'Failed to add expense'),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
     }
   }
 
-  void _showLogoutDialog(BuildContext context) {
+  void _showDeleteDialog(String expenseId) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Logout'),
-          content: const Text('Are you sure you want to logout?'),
+          title: const Text('Delete Expense'),
+          content: const Text('Are you sure you want to delete this expense?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                context.read<AuthProvider>().signOut();
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Logout'),
+              onPressed: () => _deleteExpense(expenseId),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Delete'),
             ),
           ],
         );
       },
     );
+  }
+
+  void _deleteExpense(String expenseId) async {
+    final success = await context.read<ExpenseProvider>().deleteExpense(expenseId);
+    
+    if (mounted) {
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success 
+              ? 'Expense deleted successfully!' 
+              : 'Failed to delete expense'),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
   }
 }
