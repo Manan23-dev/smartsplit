@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../providers/expense_provider.dart';
 import '../models/expense.dart';
+import 'camera_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,6 +14,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  bool _isFabExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -48,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           if (expenseProvider.expenses.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -59,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(fontSize: 20, color: Colors.grey),
                   ),
                   Text(
-                    'Add your first expense to get started',
+                    'Add your first expense or scan a receipt',
                     style: TextStyle(color: Colors.grey),
                   ),
                 ],
@@ -122,8 +125,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.blue.withOpacity(0.1),
-                          child: const Icon(Icons.receipt, color: Colors.blue),
+                          backgroundColor: _getCategoryColor(expense.category).withOpacity(0.1),
+                          child: Icon(
+                            _getCategoryIcon(expense.category), 
+                            color: _getCategoryColor(expense.category),
+                          ),
                         ),
                         title: Text(expense.title),
                         subtitle: Text(
@@ -155,17 +161,141 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddExpenseDialog,
-        backgroundColor: const Color(0xFF667eea),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Expense'),
+      floatingActionButton: _buildExpandableFab(),
+    );
+  }
+
+  Widget _buildExpandableFab() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Camera FAB
+        if (_isFabExpanded) ...[
+          FloatingActionButton(
+            onPressed: _openCamera,
+            backgroundColor: Colors.orange,
+            heroTag: "camera",
+            child: const Icon(Icons.camera_alt, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          
+          // Manual Add FAB
+          FloatingActionButton(
+            onPressed: _showAddExpenseDialog,
+            backgroundColor: Colors.green,
+            heroTag: "manual",
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+        ],
+        
+        // Main FAB
+        FloatingActionButton.extended(
+          onPressed: () {
+            setState(() {
+              _isFabExpanded = !_isFabExpanded;
+            });
+          },
+          backgroundColor: const Color(0xFF667eea),
+          foregroundColor: Colors.white,
+          icon: Icon(_isFabExpanded ? Icons.close : Icons.add),
+          label: Text(_isFabExpanded ? 'Close' : 'Add Expense'),
+        ),
+      ],
+    );
+  }
+
+  void _openCamera() {
+    setState(() {
+      _isFabExpanded = false;
+    });
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CameraScreen(
+          onReceiptScanned: _handleReceiptScanned,
+        ),
       ),
     );
   }
 
+  void _handleReceiptScanned(Map<String, dynamic> receiptData) async {
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User not authenticated'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final expense = Expense(
+      title: receiptData['title'],
+      amount: receiptData['amount'],
+      date: receiptData['date'],
+      category: receiptData['category'],
+      userId: authProvider.user!.uid,
+    );
+
+    final success = await context.read<ExpenseProvider>().addExpense(expense);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success 
+              ? 'Receipt scanned and expense added!' 
+              : 'Failed to add expense'),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Food':
+        return Icons.restaurant;
+      case 'Transport':
+        return Icons.directions_car;
+      case 'Entertainment':
+        return Icons.movie;
+      case 'Shopping':
+        return Icons.shopping_bag;
+      case 'Bills':
+        return Icons.receipt;
+      case 'Health':
+        return Icons.local_hospital;
+      default:
+        return Icons.category;
+    }
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'Food':
+        return Colors.orange;
+      case 'Transport':
+        return Colors.blue;
+      case 'Entertainment':
+        return Colors.purple;
+      case 'Shopping':
+        return Colors.green;
+      case 'Bills':
+        return Colors.red;
+      case 'Health':
+        return Colors.pink;
+      default:
+        return Colors.grey;
+    }
+  }
+
   void _showAddExpenseDialog() {
+    setState(() {
+      _isFabExpanded = false;
+    });
+
     final titleController = TextEditingController();
     final amountController = TextEditingController();
     String selectedCategory = 'Food';
